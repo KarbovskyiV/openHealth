@@ -44,15 +44,6 @@ class HealthcareServiceComponent extends Component
             'PROVIDING_CONDITION'
         );
 
-        $this->form->availableTime = collect($this->weekdays)->map(function ($day, $key) {
-            return [
-                'daysOfWeek' => [$key],
-                'allDay' => false,
-                'availableStartTime' => null,
-                'availableEndTime' => null
-            ];
-        })->values()->toArray();
-
         $this->divisionName = $division->name;
         $this->form->divisionId = $division->uuid;
         $this->divisionId = $division->id;

@@ -125,16 +125,16 @@ Route::middleware(['auth:web,ehealth', 'verified'])->group(function () {
                 ->can('create', LegalEntity::class)
                 ->name('legal-entity.create');
 
+            Route::get('/healthcare-service', HealthcareServiceIndex::class)
+                ->name('healthcare-service.index')
+                ->can('viewAny', HealthcareService::class);
+
             Route::prefix('division')->middleware(['permission:division:read|division:details'])->group(function () {
                 Route::get('/', DivisionIndex::class)->name('division.index')->can('viewAny', Division::class);
 
                 Route::get('/create', DivisionCreate::class)->name('division.create')->can('create', Division::class);
                 Route::get('/{division}', DivisionView::class)->name('division.view')->can('viewAny', Division::class);
                 Route::get('/{division}/edit', DivisionEdit::class)->name('division.edit')->can('update', 'division');
-
-                Route::get('/{division}/healthcare-service', HealthcareServiceIndex::class)
-                    ->name('healthcare-service.index')
-                    ->can('viewAny', HealthcareService::class);
                 Route::get('/{division}/healthcare-service/create', HealthcareServiceCreate::class)
                     ->name('healthcare-service.create')
                     ->can('create', HealthcareService::class);

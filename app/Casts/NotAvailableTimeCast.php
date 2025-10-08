@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Casts;
 
 use Carbon\Carbon;
@@ -10,12 +12,12 @@ class NotAvailableTimeCast implements CastsAttributes
     /**
      * Cast the given value.
      *
-     * @param mixed $model
-     * @param string $key
-     * @param mixed $value
+     * @param  mixed  $model
+     * @param  string  $key
+     * @param  mixed  $value
      * @param  array<string, mixed>  $attributes
      */
-public function get($model, string $key, $value, array $attributes): mixed
+    public function get($model, string $key, mixed $value, array $attributes): mixed
     {
         $data = json_decode($value, true);
 
@@ -36,12 +38,12 @@ public function get($model, string $key, $value, array $attributes): mixed
     /**
      * Prepare the given value for storage.
      *
-     * @param mixed $model
-     * @param string $key
-     * @param mixed $value
+     * @param  mixed  $model
+     * @param  string  $key
+     * @param  mixed  $value
      * @param  array<string, mixed>  $attributes
      */
-    public function set($model, string $key, $value, array $attributes): bool|string
+    public function set($model, string $key, mixed $value, array $attributes): bool|string
     {
         if (!is_array($value)) {
             return json_encode($value);

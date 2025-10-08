@@ -72,7 +72,7 @@
                 @click.prevent="showAdditionalParams = !showAdditionalParams"
         >
             @icon('adjustments', 'w-4 h-4')
-            <span>{{ __('patients.additional_search_parameters') }}</span>
+            <span>{{ __('forms.additional_search_parameters') }}</span>
         </button>
 
         <div x-show="showAdditionalParams" x-transition x-cloak>

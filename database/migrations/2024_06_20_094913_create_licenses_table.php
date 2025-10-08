@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('uuid')->unique()->nullable();
             $table->foreignId('legal_entity_id')->constrained()->cascadeOnDelete();
             $table->enum('type', array_column(Type::cases(), 'value'));
-            $table->string('is_active')->nullable();
+            $table->boolean('is_active')->nullable();
             $table->string('issued_by');
             $table->date('issued_date');
             $table->string('issuer_status')->nullable();

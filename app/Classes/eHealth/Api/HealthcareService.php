@@ -40,13 +40,19 @@ class HealthcareService extends Request
      *
      * If only the URL is provided (i.e., one argument) or nothing, the request will use the internal `$this->options`.
      *
-     * @param string $url The request URL.
-     * @param array|null $query Optional query parameters. If provided, it replaces any existing 'query' options.
-     *
+     * @param  string|null  $divisionUuid
+     * @param  string  $url  The request URL.
+     * @param  array|string|null  $query  Optional query parameters. If provided, it replaces any existing 'query' options.
+     * @param  bool  $groupByEntities
      * @return PromiseInterface|EHealthResponse
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function getMany(?string $divisionUuid = null, string $url = self::URL, $query = null, bool $groupByEntities = false): PromiseInterface|EHealthResponse
-    {
+    public function getMany(
+        ?string $divisionUuid = null,
+        string $url = self::URL,
+        array|string|null $query = null,
+        bool $groupByEntities = false
+    ): PromiseInterface|EHealthResponse {
         $this->setValidator($this->validateHealthcareServicesList(...));
 
         $this->groupByEntities = $groupByEntities;
@@ -62,7 +68,7 @@ class HealthcareService extends Request
             $query ?? []
         );
 
-        return parent::get($url, $mergedQuery);
+        return $this->get($url, $mergedQuery);
     }
 
     /**
@@ -76,18 +82,18 @@ class HealthcareService extends Request
     }
 
     /**
-     * Update the Division
+     * Update existing Healthcare service.
+     * There are some mutable attributes in Healthcare service:comment, available_time, not_available.
+     * All other attributes are immutable.
      *
-     * @param string $uuid
-     * @param mixed $data // Data for API request
-     *
+     * @param  string  $uuid
+     * @param  array  $data  // Data for API request
      * @return EHealthResponse|PromiseInterface
+     * @throws ConnectionException|EHealthValidationException|EHealthResponseException
      */
-    public function update(string $uuid, $data = []): PromiseInterface|EHealthResponse
+    public function update(string $uuid, array $data = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateHealthcareService(...));
-
-        return parent::patch(self::URL . '/' . $uuid, $data);
+        return $this->patch(self::URL . '/' . $uuid, $data);
     }
 
     /**
@@ -99,35 +105,31 @@ class HealthcareService extends Request
      */
     public function create(array $data = []): PromiseInterface|EHealthResponse
     {
-        $this->setValidator($this->validateHealthcareService(...));
+        $this->setValidator($this->validateCreate(...));
 
-        return $this->post(self::URL, data: $data);
+        return $this->post(self::URL, $data);
     }
 
     /**
-     * @param string $uuid unique eHealth identifier of the license
-     * @param array $data
+     * @param  string  $uuid  unique eHealth identifier of the license
      *
      * @return PromiseInterface|EHealthResponse
-     *
      * @throws ConnectionException
      */
     public function activate(string $uuid): PromiseInterface|EHealthResponse
     {
-        return parent::patch(self::URL . '/' . $uuid . self::ACTIONS_ACTIVATE);
+        return $this->patch(self::URL . '/' . $uuid . self::ACTIONS_ACTIVATE);
     }
 
     /**
-     * @param string $uuid unique eHealth identifier of the license
-     * @param array $data
+     * @param  string  $uuid  unique eHealth identifier of the license
      *
      * @return PromiseInterface|EHealthResponse
-     *
      * @throws ConnectionException
      */
     public function deactivate(string $uuid): PromiseInterface|EHealthResponse
     {
-        return parent::patch(self::URL . '/' . $uuid . self::ACTIONS_DEACTIVATE);
+        return $this->patch(self::URL . '/' . $uuid . self::ACTIONS_DEACTIVATE);
     }
 
     /**
@@ -138,8 +140,7 @@ class HealthcareService extends Request
      * - Filtering out records with invalid division references
      * - Converting array fields to JSON strings for JSONB database columns
      *
-     * @param array $healthcareServicesList Raw healthcare services data from API
-     *
+     * @param  array  $healthcareServicesList  Raw healthcare services data from API
      * @return array Processed data ready for database upsert operation
      */
     public function normalizeResponseDataForUpsert(array $healthcareServicesList, array $divisions): array
@@ -189,18 +190,18 @@ class HealthcareService extends Request
     }
 
     /**
-     * validate get Divisions input,
+     * Validate get Divisions input,
      * see: https://esoz.docs.apiary.io/#reference/administration/divisions/get-divisions
      */
     protected function validateHealthcareServicesList(EHealthResponse $response): array
     {
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             throw new Exception('validateHealthcareServicesList: ' . $response->body());
         }
 
         $replaced = [];
 
-        $healthscareServicesList = $response->getData();
+        $healthcareServicesList = $response->getData();
 
         $validationRules = ['*' => 'required|array'];
 
@@ -208,7 +209,7 @@ class HealthcareService extends Request
             $validationRules["*.{$key}"] = $rule;
         }
 
-        foreach ($healthscareServicesList as $data) {
+        foreach ($healthcareServicesList as $data) {
             $replaced[] = self::replaceEHealthPropNames($data);
         }
 
@@ -234,20 +235,56 @@ class HealthcareService extends Request
     }
 
     /**
-     * Validate single division response data
-     * see; https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/divisions/get-division-details
+     * Validate create healthcare service input,
+     * see: https://uaehealthapi.docs.apiary.io/#reference/public.-medical-service-provider-integration-layer/healthcare-services/create-healthcare-service
      */
-    public function validateHealthcareService(EHealthResponse $response): array
+    public function validateCreate(EHealthResponse $response): array
     {
-        if (!$response->successful()) {
-            throw new Exception('validateHealthcareService: ' . $response->body());
-        }
-
         $data = $response->getData();
 
         $replaced = self::replaceEHealthPropNames($data);
 
-        $validator = Validator::make($replaced, $this->getValidationRules());
+        $validator = Validator::make($replaced, [
+            'available_time' => 'array',
+            'available_time.*.all_day' => 'required_with:available_time|boolean',
+            'available_time.*.available_end_time' => 'required_if:available_time.*.all_day,false|nullable|string',
+            'available_time.*.available_start_time' => 'required_if:available_time.*.all_day,false|nullable|string',
+            'available_time.*.days_of_week' => 'required|array',
+            'available_time.*.days_of_week.*' => 'in:mon,tue,wed,thu,fri,sat,sun',
+            'category' => 'required|array',
+            'category.coding' => 'required|array',
+            'category.coding.*.code' => 'required_with:category.coding|string',
+            'category.coding.*.system' => 'required_with:category.coding|string',
+            'category.text' => 'nullable|string',
+            'comment' => 'nullable|string',
+            'coverage_area' => 'nullable|array',
+            'coverage_area.*' => 'required_with:coverage_area|string',
+            'division_id' => 'required|string',
+            'uuid' => 'required|string',
+            'ehealth_inserted_at' => 'required|date',
+            'ehealth_inserted_by' => 'required|uuid',
+            'is_active' => 'required|boolean',
+            'legal_entity_uuid' => 'required|string',
+            'license_id' => 'nullable|string',
+            'licensed_healthcare_service' => 'nullable|array',
+            'licensed_healthcare_service.status' => 'required_with:licensed_healthcare_service|string',
+            'licensed_healthcare_service.updated_at' => 'required_with:licensed_healthcare_service|string',
+            'not_available' => 'sometimes|array',
+            'not_available.*.description' => 'required_with:not_available|string',
+            'not_available.*.during' => 'required_with:not_available|array',
+            'not_available.*.during.start' => 'required_with:not_available.*.during|string',
+            'not_available.*.during.end' => 'required_with:not_available.*.during|string',
+            'providing_condition' => 'nullable|string',
+            'speciality_type' => 'nullable|string',
+            'status' => 'required|string',
+            'type' => 'nullable|array',
+            'type.coding' => 'required_with:type|array',
+            'type.coding.*' => 'required_with:type.coding|array',
+            'type.coding.*.system' => 'required_with:type.coding.*|string',
+            'type.coding.*.code' => 'required_with:type.coding.*|string',
+            'ehealth_updated_at' => 'required|date',
+            'ehealth_updated_by' => 'required|uuid',
+        ]);
 
         if ($validator->fails()) {
             Log::channel('e_health_errors')->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
@@ -318,9 +355,6 @@ class HealthcareService extends Request
             switch ($name) {
                 case 'id':
                     $replaced['uuid'] = $value;
-                    break;
-                case 'legal_entity_id':
-                    $replaced['legal_entity_uuid'] = $value;
                     break;
                 case 'inserted_at':
                     $replaced['ehealth_inserted_at'] = $value;

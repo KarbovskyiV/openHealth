@@ -46,9 +46,6 @@ class HealthcareServiceRepository
      */
     public function store(array $data): HealthcareService
     {
-        $data = $this->mapUuidsToIds($data);
-        $data = $this->replaceEHealthPropNames($data);
-
         return DB::transaction(function () use ($data) {
             $data = $this->storeCategoryAndType($data);
 
@@ -57,18 +54,47 @@ class HealthcareServiceRepository
     }
 
     /**
-     * Saves a list of healthcare services.
+     * Sync data.
      *
-     * @param  array  $responseList  The list of healthcare services to be saved.
+     * @param  array  $items
      * @return void
      * @throws Throwable
      */
-    public function saveHealthcareServiceList($responseList): void
+    public function sync(array $items): void
     {
-        DB::transaction(function () use ($responseList) {
-            foreach ($responseList as $responseItem) {
-                $this->saveHealthcareServiceResponseData($responseItem);
+        DB::transaction(function () use ($items) {
+            $divisionUuids = collect($items)->pluck('division_id')->unique()->filter();
+            $legalEntityUuids = collect($items)->pluck('legal_entity_uuid')->unique()->filter();
+
+            $divisions = Division::whereIn('uuid', $divisionUuids)->pluck('id', 'uuid');
+            $legalEntities = LegalEntity::whereIn('uuid', $legalEntityUuids)->pluck('id', 'uuid');
+
+            $dataToInsert = [];
+
+            foreach ($items as $item) {
+                $item['division_id'] = $divisions[$item['division_id']];
+                $item['legal_entity_id'] = $legalEntities[$item['legal_entity_uuid']];
+                unset($item['legal_entity_uuid']);
+
+                // Конвертуємо всі масиви в JSON
+                $item['available_time'] = isset($item['available_time'])
+                    ? json_encode($item['available_time'], JSON_THROW_ON_ERROR)
+                    : null;
+
+                $item['not_available'] = isset($item['not_available'])
+                    ? json_encode($item['not_available'], JSON_THROW_ON_ERROR)
+                    : null;
+
+                $item = $this->storeCategoryAndType($item);
+
+                $dataToInsert[] = $item;
             }
+
+            HealthcareService::upsert(
+                $dataToInsert,
+                ['uuid'],
+                new HealthcareService()->getFillable()
+            );
         });
     }
 
@@ -214,67 +240,6 @@ class HealthcareServiceRepository
         $healthcareService->fill($responseData);
 
         return $healthcareService;
-    }
-
-    /**
-     * Create instance of HealthcareService model and save it's data to the DB (with all it's relations aka: Phone)
-     *
-     * @param  array  $responseData
-     * @return HealthcareService
-     */
-    public function saveHealthcareServiceResponseData(array $responseData): HealthcareService
-    {
-        $division = $this->getDivision();
-
-        $healthcareService = $this->createOrUpdate($responseData);
-
-        $division->healthcareService()->save($healthcareService);
-
-        $healthcareService->refresh();
-
-        return $healthcareService;
-    }
-
-    /**
-     * Map uuids to ids for setting relationship.
-     *
-     * @param  array  $data
-     * @return array
-     */
-    private function mapUuidsToIds(array $data): array
-    {
-        $data['uuid'] = $data['id'];
-        unset($data['id']);
-
-        $data['legal_entity_id'] = LegalEntity::where('uuid', $data['legal_entity_id'])
-            ->pluck('id')
-            ->firstOrFail();
-        $data['division_id'] = Division::where('uuid', $data['division_id'])
-            ->pluck('id')
-            ->firstOrFail();
-
-        return $data;
-    }
-
-    /**
-     * Replaces eHealth property names with local database field names.
-     *
-     * @param  array  $properties
-     * @return array
-     */
-    protected function replaceEHealthPropNames(array $properties): array
-    {
-        return Arr::mapWithKeys(
-            $properties,
-            static fn ($value, $key) => match ($key) {
-                'id' => ['uuid' => $value],
-                'inserted_at' => ['ehealth_inserted_at' => $value],
-                'inserted_by' => ['ehealth_inserted_by' => $value],
-                'updated_at' => ['ehealth_updated_at' => $value],
-                'updated_by' => ['ehealth_updated_by' => $value],
-                default => [$key => $value]
-            }
-        );
     }
 
     protected function storeCategoryAndType(array $data): array

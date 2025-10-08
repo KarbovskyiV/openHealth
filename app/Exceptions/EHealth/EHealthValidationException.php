@@ -25,6 +25,33 @@ class EHealthValidationException extends EHealthException
     }
 
     /**
+     * Get a formatted error message including details from the eHealth response.
+     *
+     * @return string
+     */
+    public function getFormattedMessage(): string
+    {
+        $message = 'Помилка від ЕСОЗ: ' . $this->getMessage();
+
+        if (isset($this->details['error']['invalid']) && is_array($this->details['error']['invalid'])) {
+            $invalids = $this->details['error']['invalid'];
+
+            $errors = collect($invalids)
+                ->map(function ($item) {
+                    $entry = $item['entry'] ?? 'unknow field';
+                    $description = $item['rules'][0]['description'] ?? 'no description';
+
+                    return "$entry: $description";
+                })
+                ->implode(', ');
+
+            $message .= " ($errors)";
+        }
+
+        return $message;
+    }
+
+    /**
      * Get the translated error message based on eHealth details.
      *
      * @return string
@@ -67,11 +94,23 @@ class EHealthValidationException extends EHealthException
             $translatedMessage = '';
 
             if (str_contains($message, 'employee doesn\'t have speciality with active speciality_officio')) {
-                $translatedMessage = __('errors.ehealth.messages.employee doesn\'t have speciality with active speciality_officio');
-            } elseif (str_contains($message, 'speciality') && str_contains($message, ' with active speciality_officio is not allowed for doctor')) {
-                preg_match('/speciality (.+?) with active speciality_officio is not allowed for doctor/', $message, $matches);
+                $translatedMessage = __(
+                    'errors.ehealth.messages.employee doesn\'t have speciality with active speciality_officio'
+                );
+            } elseif (str_contains($message, 'speciality') && str_contains(
+                $message,
+                ' with active speciality_officio is not allowed for doctor'
+            )) {
+                preg_match(
+                    '/speciality (.+?) with active speciality_officio is not allowed for doctor/',
+                    $message,
+                    $matches
+                );
                 $specialityName = $matches[1] ?? '';
-                $translatedMessage = __('errors.ehealth.messages.speciality_officio_not_allowed', ['speciality' => $specialityName]);
+                $translatedMessage = __(
+                    'errors.ehealth.messages.speciality_officio_not_allowed',
+                    ['speciality' => $specialityName]
+                );
             } elseif (str_contains($message, 'speciality') && str_contains($message, 'not allowed for doctor')) {
                 $translatedMessage = __('errors.ehealth.messages.speciality not allowed for doctor');
             } elseif (str_contains($message, 'type mismatch')) {

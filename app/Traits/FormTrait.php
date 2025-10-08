@@ -288,33 +288,4 @@ trait FormTrait
             'error_message' => $exception->getDetails()
         ]);
     }
-
-    /**
-     * Format EHealth validation error message for user display.
-     *
-     * @param  EHealthValidationException  $exception
-     * @return string
-     */
-    protected function formatEHealthErrorMessage(EHealthValidationException $exception): string
-    {
-        $message = 'Помилка від ЕСОЗ: ' . $exception->getMessage();
-
-        // Checking for validation error details.
-        if (property_exists($exception, 'details') && isset($exception->details['error']['invalid'])) {
-            $invalids = $exception->details['error']['invalid'];
-
-            $errors = collect($invalids)
-                ->map(function ($item) {
-                    $entry = $item['entry'] ?? 'unknow field';
-                    $description = $item['rules'][0]['description'] ?? 'no description';
-
-                    return "$entry: $description";
-                })
-                ->implode(', ');
-
-            $message .= " ($errors)";
-        }
-
-        return $message;
-    }
 }

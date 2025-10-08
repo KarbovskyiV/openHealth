@@ -17,7 +17,6 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use App\Exceptions\CustomValidationException;
 use App\Rules\DivisionRules\HealthcareRules\AvailableTimeRule;
 use App\Rules\DivisionRules\HealthcareRules\ProvidingConditionRule;
 use Livewire\Form;
@@ -137,24 +136,6 @@ class HealthcareServiceForm extends Form
         return $this->healthcare_service[$param] ?? '';
     }
 
-    public function setHealthcareServiceParam(string $param, mixed $value): void
-    {
-        $this->healthcare_service[$param] = $value;
-    }
-
-    protected function customRulesValidation(string $mode): string
-    {
-        foreach ($this->customRules($mode) as $rule) {
-            try {
-                $rule->validate('', '', fn () => null);
-            } catch (CustomValidationException $e) {
-                return $e->getMessage();
-            }
-        }
-
-        return '';
-    }
-
     /**
      * Do form's validation (correctness of filling the form fields)
      *
@@ -220,37 +201,6 @@ class HealthcareServiceForm extends Form
                 'unique_combination' => __('validation.attributes.healthcareService.constraint.categoryPharmacy')
             ]);
         }
-    }
-
-    public function addAvailableTime($k): void
-    {
-        $this->healthcare_service['available_time'][$k] = [
-            'days_of_week' => get_day_key($k),
-            'all_day' => false,
-            'available_start_time' => '',
-            'available_end_time' => '',
-        ];
-    }
-
-    public function removeAvailableTime($k): void
-    {
-        unset($this->healthcare_service['available_time'][$k]);
-    }
-
-    public function addNotAvailableTime(): void
-    {
-        $this->healthcare_service['not_available'][] = [
-            'description' => '',
-            'during' => [
-                'start' => '',
-                'end' => '',
-            ],
-        ];
-    }
-
-    public function removeNotAvailable($k): void
-    {
-        unset($this->healthcare_service['not_available'][$k]);
     }
 
     /**

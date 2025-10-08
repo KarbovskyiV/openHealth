@@ -44,7 +44,7 @@
 
                             <button class="flex items-center gap-2 button-minor" @click="showFilter = !showFilter">
                                 @icon('adjustments', 'w-4 h-4')
-                                <span>{{ __('patients.additional_search_parameters') }}</span>
+                                <span>{{ __('forms.additional_search_parameters') }}</span>
                             </button>
                         </div>
 

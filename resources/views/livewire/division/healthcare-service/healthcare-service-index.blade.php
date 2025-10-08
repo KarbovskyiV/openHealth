@@ -1,19 +1,29 @@
 @use('App\Enums\Status')
 
+@php
+    $tableHeaders = [
+            __('healthcare-services.specialisation'),
+            __('forms.division_name'),
+            __('healthcare-services.providing_condition'),
+            __('healthcare-services.created_at'),
+            __('healthcare-services.status'),
+            __('forms.action')
+        ];
+@endphp
+
 <div>
     <x-messages/>
+    <x-forms.loading/>
 
     <x-section-navigation x-data="{ showFilter: false }">
         <x-slot name="title">{{ __('forms.services') }}</x-slot>
-        <x-slot name="description">{{ $currentDivision['type'] }} '{{ $currentDivision['name'] }}'</x-slot>
         <x-slot name="navigation">
             <div class="rounded-sm border-stroke shadow-default dark:border-strokedark dark:bg-boxdark">
                 <div x-data="{ isDivisionActive: @js($divisionStatus) }"
                      class="flex justify-end border-stroke gap-2 px-7 py-4 dark:border-strokedark"
                      x-cloak
                 >
-                    <a href="{{ route('healthcare-service.create', [legalEntity(), $division]) }}"
-                       x-show="isDivisionActive"
+                    <a href="{{ route('healthcare-service.create', [legalEntity(), 64]) }}"
                        type="button"
                        class="button-primary"
                     >
@@ -35,37 +45,37 @@
                     <x-slot name="headers" :list="$tableHeaders"></x-slot>
                     <x-slot name="tbody">
                         @nonempty($healthcareServices->items())
-                        @foreach ($healthcareServices as $k => $service)
+                        @foreach ($healthcareServices as $service)
                             <tr>
                                 <td class="p-4 text-sm text-center font-normal text-gray-500 whitespace-nowrap dark:text-gray-400">
                                     <p class="font-semibold text-gray-900 dark:text-white">
-                                        {{ $service->uuid ?? '' }}
+                                        {{ $dictionaries['SPECIALITY_TYPE'][$service->speciality_type] }}
                                     </p>
                                 </td>
 
                                 <td class="p-4 text-sm font-normal text-center text-gray-500 whitespace-nowrap dark:text-gray-400">
                                     <p class="inline-flex items-center font-medium text-gray-600 dark:text-gray-500">
-{{--                                        {{ $dictionaries['show']['HEALTHCARE_SERVICE_CATEGORIES'][$service->healthcare_category] ?? '' }}--}}
+                                        {{ $service->division->name }}
                                     </p>
                                 </td>
 
                                 <td class="p-4 text-sm font-normal text-center text-gray-500 whitespace-nowrap dark:text-gray-400">
                                     <p class="inline-flex items-center font-medium text-gray-600 dark:text-gray-500">
-                                        {{ $dictionaries['show']['PROVIDING_CONDITION'][$service->providing_condition] ?? '' }}
+                                        {{ $dictionaries['PROVIDING_CONDITION'][$service->providing_condition] }}
                                     </p>
                                 </td>
 
                                 <td class="p-4 text-sm font-normal text-center text-gray-500 whitespace-nowrap dark:text-gray-400 ">
                                     <p class="text-gray-900 dark:text-white">
-                                        {{ $dictionaries['show']['SPECIALITY_TYPE'][$service->speciality_type] ?? '' }}
+                                        {{ $service->created_at->format('d.m.Y') }}
                                     </p>
                                 </td>
 
                                 <td class="p-4 text-sm font-normal text-center text-gray-500 whitespace-nowrap dark:text-gray-400">
                                     @if ($service->status === Status::INACTIVE)
-                                        <span class="rejected text-meta-1">{{ Status::INACTIVE->label() }}</span>
+                                        <span class="badge-red text-meta-1">{{ Status::INACTIVE->label() }}</span>
                                     @else
-                                        <span class="approved text-meta-3">{{ Status::ACTIVE->label() }}</span>
+                                        <span class="badge-green text-meta-3">{{ Status::ACTIVE->label() }}</span>
                                     @endif
                                 </td>
 
@@ -181,7 +191,4 @@
             </a>
         </x-secondary-button>
     </div>
-
-    @include('livewire.division._parts._healthcare_service_form')
-
 </div>

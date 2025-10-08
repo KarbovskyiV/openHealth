@@ -3,16 +3,37 @@
               working: false,
               localAvailableTime: [],
               isDisabled: false,
+              weekdaysKeys: {{ json_encode(array_keys($weekdays)) }},
               init() {
-                  this.localAvailableTime = [...$wire.form.availableTime];
+                  // Create default structure for all days
+                  const defaultTimes = this.weekdaysKeys.map(key => ({
+                      daysOfWeek: [key],
+                      working: false,
+                      allDay: false,
+                      availableStartTime: null,
+                      availableEndTime: null
+                  }));
 
-                  // Watch changes in localAvailableTime and update Livewire property
+                  // Merge existing data (for edit mode)
+                  const existing = $wire.form.availableTime || [];
+                  existing.forEach(ex => {
+                      const day = ex.daysOfWeek[0];
+                      const idx = this.weekdaysKeys.indexOf(day);
+                      if (idx !== -1) {
+                          defaultTimes[idx] = { ...defaultTimes[idx], ...ex, working: true };
+                      }
+                  });
+
+                  this.localAvailableTime = defaultTimes;
+
+                  // Watch and sync filtered data to Livewire (strip 'working')
                   this.$watch('localAvailableTime', (value) => {
-                      // Filter only available times with data and preserve daysOfWeek
                       const filtered = value.filter(item =>
+                          item.working &&
                           (item.availableStartTime || item.availableEndTime || item.allDay) &&
                           item.daysOfWeek && item.daysOfWeek.length > 0
-                      );
+                      ).map(({ working, ...rest }) => rest);
+
                       $wire.form.availableTime = filtered;
                   }, { deep: true });
               }
@@ -48,7 +69,7 @@
             @foreach ($weekdays as $key => $day)
                 <div
                     class="p-6 min-h-[220px] {{ $loop->iteration % 2 === 0 ? '' : 'border-r border-gray-200 dark:border-gray-700' }} {{ $loop->last ? '' : 'border-b border-gray-200 dark:border-gray-700' }} ">
-                    <div :key="'{{ $key }}'" x-data="{ working: false }">
+                    <div :key="'{{ $key }}'">
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ $day }}</h3>
                         </div>
@@ -58,24 +79,29 @@
                             <label class="inline-flex items-center cursor-pointer">
                                 <input type="checkbox"
                                        class="sr-only peer"
-                                       x-model="working"
+                                       x-model="localAvailableTime[{{ $loop->index }}].working"
                                        x-bind:disabled="isDisabled"
+                                       @change="if (!localAvailableTime[{{ $loop->index }}].working) {
+                                           localAvailableTime[{{ $loop->index }}].allDay = false;
+                                           localAvailableTime[{{ $loop->index }}].availableStartTime = null;
+                                           localAvailableTime[{{ $loop->index }}].availableEndTime = null;
+                                       }"
                                 >
                                 <div
                                     class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:bg-gray-700 dark:peer-focus:ring-blue-800 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all peer-checked:bg-blue-600 dark:peer-checked:bg-blue-600 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full"></div>
                                 <span class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300"
-                                      x-text="working ? '{{ __('forms.works') }}' : '{{ __('forms.does_not_work') }}'"
+                                      x-text="localAvailableTime[{{ $loop->index }}].working ? '{{ __('forms.works') }}' : '{{ __('forms.does_not_work') }}'"
                                 ></span>
                             </label>
 
                             {{-- All day --}}
                             <label class="inline-flex items-center cursor-pointer"
-                                   x-bind:class="!working && 'opacity-40 pointer-events-none'"
+                                   x-bind:class="!localAvailableTime[{{ $loop->index }}].working && 'opacity-40 pointer-events-none'"
                             >
                                 <input type="checkbox"
                                        x-model="localAvailableTime[{{ $loop->index }}].allDay"
-                                       x-bind:disabled="!working || isDisabled"
-                                       @change="if(localAvailableTime[{{ $loop->index }}].allDay) {
+                                       x-bind:disabled="!localAvailableTime[{{ $loop->index }}].working || isDisabled"
+                                       @change="if (localAvailableTime[{{ $loop->index }}].allDay) {
                                            localAvailableTime[{{ $loop->index }}].availableStartTime = null;
                                            localAvailableTime[{{ $loop->index }}].availableEndTime = null;
                                        }"
@@ -89,7 +115,7 @@
 
                         {{-- Show time if working and not all day --}}
                         <div class="flex gap-4"
-                             x-show="working && !localAvailableTime[{{ $loop->index }}].allDay"
+                             x-show="localAvailableTime[{{ $loop->index }}].working && !localAvailableTime[{{ $loop->index }}].allDay"
                         >
                             {{-- Start --}}
                             <div class="form-group w-full">
